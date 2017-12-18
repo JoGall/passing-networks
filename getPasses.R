@@ -1,18 +1,25 @@
-getPasses <- function(xml) {
+library(XML)
+library(dplyr)
+require(plyr)
+
+getPasses <- function(url) {
+  
+  xml <- xml <- xmlParse(url)
+  
   # extract values from XML doc
   df <- xml %>% 
     xpathSApply("//*/all_passes//time_slice//event", dumFun) %>%
     t %>%
     as.data.frame(stringsAsFactors = FALSE) %>%
     sapply(unlist) %>% 
-    ldply(rbind) %>%
+    plyr::ldply(rbind) %>%
     as.data.frame
 
   # get team and player names
   playerdf <- getPlayerNames(xml)
   teamdf <- getTeamNames(xml)
   df$team <- playerdf$team[match(df$team_id, playerdf$team_id)]
-  df$player <- playerdf$name[match(df$player_id, playerdf$player_id)]
+  df$player <- playerdf$player[match(df$player_id, playerdf$player_id)]
   
   # get start and end x,y-coords
   df$x.start <- sub(",.*", "", df$start)
@@ -31,9 +38,8 @@ getPasses <- function(xml) {
     mutate(time = as.numeric(as.character(minsec))) %>%
     arrange(time) %>%
     mutate(receiver = lead(player)) %>%
-    mutate(receiver = if_else(type=="completed", receiver, 0)) %>%
-    select(team, passer = player, receiver, time, mins, secs, x.start, y.start, x.end, y.end, outcome = type, assist = assists, key = k, headed, throw = throw_ins)
-    
+    mutate(completed = if_else(type=="completed", 1, 0)) %>%
+    select(team, passer = player, receiver, time, mins, secs, x.start, y.start, x.end, y.end, completed, assist = assists, key = k, headed, throw = throw_ins)
 }
 
 getPlayerNames <- function(xml) {
@@ -56,5 +62,4 @@ getTeamNames <- function(xml) {
 }
 
 url <- "http://s3-irl-epl.squawka.com/dp/ingame/32991"
-xml <- xmlParse(url)
-dat <- getPasses(xml)
+dat <- getPasses(url)
